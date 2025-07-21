@@ -29,34 +29,26 @@ func Parse(root string) (map[string]string, error) {
 
 	paths, errc := walkRoot(ctx, root)
 
-	res := digesterPool(ctx, root, paths, numDigesters)
+	res := digest(ctx, root, paths, numDigesters)
 
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	//Ignores permission errors
-	go func() {
-		defer wg.Done()
-		for r := range res {
-			if r.err != nil && !errors.Is(r.err, fs.ErrPermission) {
-				select {
-				case errc <- r.err:
-					cancel()
-					return
-				default:
-				}
-			}
-			m[r.path] = hex.EncodeToString(r.sum[:])
+	for r := range res {
+		if r.err != nil && !errors.Is(r.err, fs.ErrPermission) {
+			m[r.path] = r.err.Error()
 		}
-	}()
-	wg.Wait()
-	err, ok := <-errc
-	if ok && err != nil {
-		return nil, err
-	} else {
-		return m, nil
+		m[r.path] = hex.EncodeToString(r.sum[:])
 	}
+
+	select {
+	case err := <-errc:
+		if err != nil {
+			return nil, err
+		}
+	default:
+	}
+	return m, nil
 }
 
+// Ignores nested dirs and symlinks
 func walkRoot(ctx context.Context, root string) (<-chan string, chan error) {
 	paths := make(chan string)
 	errc := make(chan error, 1)
@@ -65,7 +57,6 @@ func walkRoot(ctx context.Context, root string) (<-chan string, chan error) {
 			close(paths)
 			close(errc)
 		}()
-		//Ignores nested dirs and symlinks
 		fileInfo, err := os.Stat(root)
 		if err != nil {
 			errc <- err
@@ -96,7 +87,7 @@ func walkRoot(ctx context.Context, root string) (<-chan string, chan error) {
 	return paths, errc
 }
 
-func digesterPool(ctx context.Context, root string, paths <-chan string, numDigesters int) <-chan result {
+func digest(ctx context.Context, root string, paths <-chan string, numDigesters int) <-chan result {
 	res := make(chan result)
 	wg := &sync.WaitGroup{}
 	wg.Add(numDigesters)
@@ -128,11 +119,7 @@ func digester(ctx context.Context, root string, paths <-chan string, res chan<- 
 				res <- result{err: hashErr}
 				continue
 			}
-			if pathErr != nil {
-				res <- result{err: pathErr}
-				continue
-			}
-			res <- result{path: rel, sum: hashSum, err: nil}
+			res <- result{path: rel, sum: hashSum, err: pathErr}
 		}
 	}
 }
