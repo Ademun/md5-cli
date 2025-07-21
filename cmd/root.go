@@ -7,8 +7,6 @@ import (
 	"sort"
 	"time"
 
-	"ademun/md5/utils"
-
 	"github.com/spf13/cobra"
 )
 
@@ -24,13 +22,10 @@ var rootCmd = &cobra.Command{
 			fmt.Println("Please specify a path to directory / file")
 			return
 		}
-		var profiler utils.Profiler
 		if profilingMode {
-			profiler = *utils.NewProfiler()
-			profiler.Start()
+			start := time.Now()
 			defer func() {
-				profiler.Stop()
-				profiler.Stat(time.Second)
+				fmt.Println("total time:", time.Since(start))
 			}()
 		}
 		path, err := filepath.Abs(args[0])
