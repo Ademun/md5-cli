@@ -4,7 +4,7 @@ A concise Go-based command-line utility for computing MD5 file hashes.
 
 ## Features
 - Parallel file processing
-- Directory and single file 
+- Directory and single file support
 
 ## Usage
 ```bash
