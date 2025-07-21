@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"time"
 
@@ -32,7 +33,12 @@ var rootCmd = &cobra.Command{
 				profiler.Stat(time.Second)
 			}()
 		}
-		data, err := Parse(args[0])
+		path, err := filepath.Abs(args[0])
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		data, err := Parse(path)
 		if err != nil {
 			fmt.Println(err)
 			return
