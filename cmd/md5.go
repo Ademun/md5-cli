@@ -115,49 +115,47 @@ func digesterPool(ctx context.Context, root string, paths <-chan string, numDige
 
 func digester(ctx context.Context, root string, paths <-chan string, res chan<- result) {
 	for p := range paths {
-		//Read file in chunks
-		buf := make([]byte, chunkSize)
-		hash := make([]byte, 0)
-		file, rferr := os.Open(p)
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			if rferr != nil {
-				res <- result{err: rferr}
-				continue
-			}
-		}
-		for {
-			_, err := file.Read(buf)
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				rferr = err
-			}
-			sum := md5.Sum(buf)
-			hash = hex.AppendEncode(hash, sum[:])
-		}
-		hashSum := md5.Sum(hash)
-		//Write data to channel
-		rel, fperr := filepath.Rel(root, p)
-		if root == p {
+		hashSum, hashErr := md5Sum(p)
+		rel, pathErr := filepath.Rel(root, p)
+		if root == p || pathErr != nil {
 			rel = root
 		}
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			if rferr != nil {
-				res <- result{err: rferr}
+			if hashErr != nil {
+				res <- result{err: hashErr}
 				continue
 			}
-			if fperr != nil {
-				res <- result{err: fperr}
+			if pathErr != nil {
+				res <- result{err: pathErr}
 				continue
 			}
 			res <- result{path: rel, sum: hashSum, err: nil}
 		}
 	}
+}
+
+// Process file in chunks
+func md5Sum(path string) ([md5.Size]byte, error) {
+	buf := make([]byte, chunkSize)
+	hash := make([]byte, 0)
+	file, err := os.Open(path)
+	if err != nil {
+		return [md5.Size]byte{}, err
+	}
+	for {
+		_, err := file.Read(buf)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return [md5.Size]byte{}, err
+		}
+		sum := md5.Sum(buf)
+		hash = hex.AppendEncode(hash, sum[:])
+	}
+	hashSum := md5.Sum(hash)
+	return hashSum, nil
 }
