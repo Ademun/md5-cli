@@ -136,6 +136,7 @@ func md5Sum(path string) ([md5.Size]byte, error) {
 		_, err := file.Read(buf)
 		if err != nil {
 			if err == io.EOF {
+				file.Close()
 				break
 			}
 			return [md5.Size]byte{}, err
